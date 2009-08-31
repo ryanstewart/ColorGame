@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" 
+	minWidth="450" minHeight="400" xmlns:rtc="AfcsNameSpace"
+	creationComplete="init(event)" viewSourceURL="srcview/index.html">
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import com.adobe.rtc.sharedManagers.descriptors.UserDescriptor;
+			import com.adobe.rtc.messaging.NodeConfiguration;
+			import com.adobe.rtc.events.SharedObjectEvent;
+			import com.adobe.rtc.sharedModel.SharedObject;
+			import com.adobe.rtc.events.SessionEvent;
+			import com.adobe.rtc.sharedModel.CollectionNode;
+			import com.adobe.rtc.events.SharedPropertyEvent;
+			import mx.events.ColorPickerEvent;
+			import com.adobe.rtc.sharedModel.SharedProperty;
+			import mx.events.FlexEvent;
+
+			public var sharedColor:com.adobe.rtc.sharedModel.SharedObject;
+			public var nodeGame:CollectionNode;
+			
+			[Bindable]
+			private var _username:String = "your username here";
+			[Bindable]
+			private var _password:String = "your password here";
+			[Bindable]
+			private var _roomURL:String = "http://connectnow.acrobat.com/cocoryan/collections"; 
+
+			protected function generateRandomColor():uint
+			{
+				var ct:ColorTransform = new ColorTransform(1,1,1,1,Math.random()*0xFF,Math.random()*0xFF,Math.random()*0xFF);
+				return ct.color;
+			}
+
+			protected function init(event:FlexEvent):void
+			{
+				generateRandomColor();
+			}
+
+
+			protected function color_changeHandler(event:ColorPickerEvent):void
+			{
+				sharedColor.setProperty(cSession.userManager.myUserID,color.selectedColor);
+			}
+			
+			protected function onSharedChange(event:SharedPropertyEvent):void
+			{
+				trace('test');
+			}
+
+
+			protected function cSession_synchronizationChangeHandler(event:SessionEvent):void
+			{
+				if( event.type == SessionEvent.SYNCHRONIZATION_CHANGE )
+				{
+					var config:NodeConfiguration = new NodeConfiguration();
+						config.userDependentItems = true;
+
+					sharedColor = new com.adobe.rtc.sharedModel.SharedObject();
+					sharedColor.sharedID = "color";
+					sharedColor.setNodeConfiguration(config);
+					sharedColor.subscribe();
+					sharedColor.addEventListener(SharedObjectEvent.PROPERTY_ADD, onPropertyChange);
+					sharedColor.addEventListener(SharedObjectEvent.PROPERTY_CHANGE, onPropertyChange);
+					sharedColor.addEventListener(SharedObjectEvent.PROPERTY_REMOVE, onPropertyRemove);				
+				}
+			}
+			
+			protected function onPropertyChange(event:SharedObjectEvent):void
+			{
+				if( event.propertyName != cSession.userManager.myUserID)
+				{
+					if(event.value == color.selectedColor)
+					{
+						var user:UserDescriptor = cSession.userManager.getUserDescriptor(event.propertyName);
+						sharedColor.removeProperty(cSession.userManager.myUserID);
+						Alert.show("You matched with " + user.displayName + "!");
+					}
+				}
+			}
+			
+			protected function onPropertyRemove(event:SharedObjectEvent):void
+			{
+				var user:UserDescriptor = cSession.userManager.getUserDescriptor(event.propertyName);
+				if( event.propertyName != cSession.userManager.myUserID && user != null)
+				{
+					Alert.show("You matched with " + user.displayName + "!");
+				}
+			}
+
+
+			protected function btnLogin_clickHandler(event:MouseEvent):void
+			{
+				// Set the uername for the session
+				cSession.userManager.setUserDisplayName(cSession.userManager.myUserID,username.text);
+				
+				// Make the game available
+				panelColor.enabled = true;
+				panelColor.alpha = 1;
+				tw.visible = false;
+				
+			}
+
+		]]>
+	</mx:Script>
+	<rtc:AdobeHSAuthenticator id="auth" />
+	<rtc:ConnectSessionContainer id="cSession" 
+		authenticator="{auth}" 
+		roomURL="{_roomURL}"
+		synchronizationChange="cSession_synchronizationChangeHandler(event)">
+		<mx:Panel id="panelColor" title="Pick a Color!"
+			horizontalCenter="0" verticalCenter="0" alpha=".3" 
+			width="200" height="200" enabled="false">
+			<mx:ColorPicker id="color" change="color_changeHandler(event)" width="100%" height="100%" />
+			<mx:Label text="Playing with {cSession.userManager.userCollection.length - 1} other people" />	
+		</mx:Panel>
+		
+		<mx:TitleWindow id="tw" horizontalCenter="0" verticalCenter="0">
+			<mx:TextInput id="username" width="150" text="Enter A Username" focusIn="{username.text = ''}" />
+			<mx:Button id="btnLogin" label="Login" click="btnLogin_clickHandler(event)" /> 
+		</mx:TitleWindow>
+	</rtc:ConnectSessionContainer>
+</mx:Application>
